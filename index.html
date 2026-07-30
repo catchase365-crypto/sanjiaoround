@@ -12,7 +12,7 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: #0c1013;
+            background-color: #000000; /* 全局漆黑 */
             font-family: 'Helvetica Neue', Arial, sans-serif;
             user-select: none;
         }
@@ -26,7 +26,8 @@
             height: 100vh;
             z-index: -1;
             overflow: hidden;
-            background-color: #050709;
+            background-color: #000000;
+            display: none; /* 彻底隐藏花里胡哨的背景，拥抱纯黑宇宙深空 */
         }
         .liquid-circle {
             position: absolute;
@@ -262,27 +263,21 @@
                 this.controls.noPan = true;
                 this.controls.dynamicDampingFactor = 0.1;
 
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+                // 提升全局环境光，提供柔和无死角的漫反射，保证色彩鲜艳
+                const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
                 this.scene.add(ambientLight);
 
-                // 增加半球光，提供无死角漫反射环境，消除光照盲区
-                const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+                const hemiLight = new THREE.HemisphereLight(0xffffff, 0x333333, 0.9);
                 this.scene.add(hemiLight);
 
-                const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-                dirLight1.position.set(5, 10, 7);
-                this.scene.add(dirLight1);
+                // 彻底删除了容易产生刺眼晃眼高光的 DirectionalLight (平行光)
 
-                const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
-                dirLight2.position.set(-5, -5, -5);
-                this.scene.add(dirLight2);
-
+                // 创建纯黑深邃环境贴图，消除球面金属对亮色天空的晃眼反射
                 const envCanvas = document.createElement('canvas');
                 envCanvas.width = 256; envCanvas.height = 256;
                 const envCtx = envCanvas.getContext('2d');
-                const envGrad = envCtx.createLinearGradient(0, 0, 256, 256);
-                envGrad.addColorStop(0, '#0d1b2a'); envGrad.addColorStop(0.5, '#415a77'); envGrad.addColorStop(1, '#e0e1dd');
-                envCtx.fillStyle = envGrad; envCtx.fillRect(0, 0, 256, 256);
+                envCtx.fillStyle = '#050505'; // 宇宙深空的漆黑环境映射
+                envCtx.fillRect(0, 0, 256, 256);
                 const envTexture = new THREE.CanvasTexture(envCanvas);
                 envTexture.mapping = THREE.EquirectangularReflectionMapping;
 
@@ -316,14 +311,10 @@
                     });
                 });
 
-                // 空白块材质 (纯黑黑曜石质感，叠加真实自发光线条特效)
-                const emptyTex = TextureFactory.createEmptyTexture();
+                // 空白块材质 (极简纯黑，宛如黑洞或黑曜石镜面)
                 this.emptyMaterial = new THREE.MeshStandardMaterial({ 
-                    map: emptyTex, 
-                    emissiveMap: emptyTex, // 使用同一张贴图作为发光遮罩，实现线条自发光
-                    emissive: 0xffffff, 
-                    emissiveIntensity: 0.9,
-                    roughness: 0.05, // 极低粗糙度，黑曜石镜面质感
+                    color: 0x000000, // 极致纯黑
+                    roughness: 0.05, // 极低粗糙度，保留镜面反光质感
                     metalness: 0.9,
                     envMap: envTexture,
                     envMapIntensity: 1.5,
