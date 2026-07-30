@@ -107,6 +107,70 @@
         // 彻底清除了噪点生成，保留花朵纹理，保证材质的纯净和抗锯齿
         const TextureFactory = {
             cache: {},
+            // 新增：专属的纯黑深邃、多线渐变发光能量核心贴图
+            createEmptyTexture() {
+                if(this.cache['empty']) return this.cache['empty'];
+                const size = 512; 
+                const canvas = document.createElement('canvas'); 
+                canvas.width = size; canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                // 纯黑深邃底色
+                ctx.fillStyle = '#030508'; 
+                ctx.fillRect(0, 0, size, size);
+                
+                const m = size / 2;
+                ctx.lineCap = 'round'; 
+                ctx.lineJoin = 'round';
+                
+                // 绘制多重渐变同心能量环
+                for (let i = 0; i < 4; i++) {
+                    const r = 40 + i * 45;
+                    const grad = ctx.createLinearGradient(m - r, m - r, m + r, m + r);
+                    grad.addColorStop(0, '#00e5ff'); 
+                    grad.addColorStop(0.5, '#b400ff'); 
+                    grad.addColorStop(1, '#00e5ff');
+                    
+                    ctx.beginPath(); 
+                    ctx.arc(m, m, r, 0, Math.PI * 2);
+                    ctx.strokeStyle = grad; 
+                    ctx.lineWidth = 4; 
+                    ctx.shadowBlur = 15; 
+                    ctx.shadowColor = i % 2 === 0 ? '#00e5ff' : '#b400ff'; 
+                    ctx.stroke();
+                }
+                
+                // 绘制放射状能量射线
+                for(let i = 0; i < 12; i++) {
+                    const angle = (i * Math.PI * 2) / 12;
+                    ctx.beginPath(); 
+                    ctx.moveTo(m + Math.cos(angle) * 20, m + Math.sin(angle) * 20); 
+                    ctx.lineTo(m + Math.cos(angle) * 220, m + Math.sin(angle) * 220);
+                    
+                    const grad = ctx.createLinearGradient(m, m, m + Math.cos(angle) * 220, m + Math.sin(angle) * 220);
+                    grad.addColorStop(0, 'rgba(0, 229, 255, 0.9)'); 
+                    grad.addColorStop(1, 'rgba(180, 0, 255, 0)');
+                    
+                    ctx.strokeStyle = grad; 
+                    ctx.lineWidth = 3; 
+                    ctx.shadowBlur = 10; 
+                    ctx.shadowColor = '#00e5ff'; 
+                    ctx.stroke();
+                }
+                
+                // 极亮核心耀斑
+                ctx.beginPath(); 
+                ctx.arc(m, m, 15, 0, Math.PI * 2); 
+                ctx.fillStyle = '#ffffff'; 
+                ctx.shadowBlur = 30; 
+                ctx.shadowColor = '#00ffff'; 
+                ctx.fill();
+                
+                const tex = new THREE.CanvasTexture(canvas); 
+                tex.anisotropy = 8;
+                this.cache['empty'] = tex; 
+                return tex;
+            },
             createTexture(colorHex) {
                 if(this.cache[colorHex]) return this.cache[colorHex];
                 
@@ -116,8 +180,8 @@
                 const ctx = canvas.getContext('2d');
                 const col = new THREE.Color(colorHex);
                 
-                // 纯净底色 (RGB 强制取整，兼容安卓 Canvas2D)
-                ctx.fillStyle = `rgb(${Math.round(col.r*210)}, ${Math.round(col.g*210)}, ${Math.round(col.b*210)})`;
+                // 纯净高饱和底色 (解除原有的色彩压暗，保持 100% 原色饱和度)
+                ctx.fillStyle = `rgb(${Math.round(col.r*255)}, ${Math.round(col.g*255)}, ${Math.round(col.b*255)})`;
                 ctx.fillRect(0,0,size,size);
                 
                 // 柔和径向渐变（代替原来的噪点）
@@ -222,40 +286,48 @@
                 const envTexture = new THREE.CanvasTexture(envCanvas);
                 envTexture.mapping = THREE.EquirectangularReflectionMapping;
 
-                // 12 个绝对独立的硬核辨识色彩 (十六进制)
+                // 12 个绝对独立的硬核辨识色彩 (6深色 + 6明亮色 极强对比度组合)
                 const palette12 = [
-                    0xE6194B, // 0. 红
-                    0x3CB44B, // 1. 绿
-                    0xFFE119, // 2. 黄
-                    0x4363D8, // 3. 蓝
-                    0xF58231, // 4. 橙
-                    0x911EB4, // 5. 紫
-                    0x42D4F4, // 6. 青
-                    0xF032E6, // 7. 品红
-                    0xBFEF45, // 8. 青柠
-                    0xFABED4, // 9. 粉
-                    0x469990, // 10. 青翠
-                    0x9A6324  // 11. 褐
+                    // --- 6款深邃纯色 ---
+                    0x8B0000, // 0. 暗红
+                    0x002B5E, // 1. 幽蓝
+                    0x004225, // 2. 墨绿
+                    0x30004A, // 3. 深紫
+                    0x542A00, // 4. 焦糖褐
+                    0x004747, // 5. 深青
+                    // --- 6款高亮荧光色 ---
+                    0xFF4D4D, // 6. 亮珊瑚红
+                    0x33CCFF, // 7. 亮天蓝
+                    0x39FF14, // 8. 荧光绿
+                    0xFF33CC, // 9. 亮品红
+                    0xFFE100, // 10. 明黄
+                    0x9D8CFF  // 11. 亮紫罗兰 (极度冷色调，与明黄彻底解耦)
                 ];
 
-                // 批量生成 12 种材质（提高粗糙度、降低金属度并调亮环境强度以彻底消除黑斑）
+                // 批量生成 12 种材质 (既然排除了材质Bug，恢复环境反光让质感更好，同时保持双面渲染)
                 this.regionMaterials = palette12.map(hex => {
                     return new THREE.MeshStandardMaterial({ 
                         map: TextureFactory.createTexture(hex), 
-                        roughness: 0.45, 
-                        metalness: 0.05, 
-                        envMap: envTexture, 
-                        envMapIntensity: 1.0 
+                        roughness: 0.25, 
+                        metalness: 0.1,
+                        envMap: envTexture,
+                        envMapIntensity: 0.6,
+                        side: THREE.DoubleSide
                     });
                 });
 
-                // 空白块材质 (白色)
+                // 空白块材质 (纯黑黑曜石质感，叠加真实自发光线条特效)
+                const emptyTex = TextureFactory.createEmptyTexture();
                 this.emptyMaterial = new THREE.MeshStandardMaterial({ 
-                    map: TextureFactory.createTexture(0xe6e6e6), 
-                    roughness: 0.4, 
-                    metalness: 0.05, 
-                        envMap: envTexture, 
-                        envMapIntensity: 1.0 
+                    map: emptyTex, 
+                    emissiveMap: emptyTex, // 使用同一张贴图作为发光遮罩，实现线条自发光
+                    emissive: 0xffffff, 
+                    emissiveIntensity: 0.9,
+                    roughness: 0.05, // 极低粗糙度，黑曜石镜面质感
+                    metalness: 0.9,
+                    envMap: envTexture,
+                    envMapIntensity: 1.5,
+                    side: THREE.DoubleSide
                 });
 
                 // 球体底座、边框金属材质
@@ -298,8 +370,35 @@
                 const shrinkFactor = 0.92;
                 const extrudeHeight = 0.06;
 
+                // 核心修复：大幅缩小内部纯黑底座的半径(从 R-0.02 缩到 R-0.25)。
+                // 因为按键是平面的，中心会往内凹陷，原半径过大导致内部黑球直接穿透了按键表面形成黑斑！
+                // 恢复贴合尺寸：按键已呈完美弧面，内芯重新撑满，彻底消除镂空廉价感
                 const baseSphere = new THREE.Mesh(new THREE.SphereGeometry(R - 0.02, 64, 64), this.materials.base);
                 this.scene.add(baseSphere);
+
+                // --- 新增：赛博朋克风霓虹隔离线管 --- 
+                const tubeRadius = 0.025; // 确保赤道与经线完全等粗
+                const neonRadius = R + 0.015; // 让线管微微浮在底座上，完美卡在按键缝隙中间
+                const neonMat = new THREE.MeshStandardMaterial({
+                    color: 0x00e5ff, 
+                    emissive: 0x00aaff,
+                    emissiveIntensity: 3.0,
+                    roughness: 0.2,
+                    metalness: 0.8
+                });
+
+                // 1. 赤道隔离条
+                const equator = new THREE.Mesh(new THREE.TorusGeometry(neonRadius, tubeRadius, 16, 128), neonMat);
+                equator.rotation.x = Math.PI / 2;
+                this.scene.add(equator);
+
+                // 2. 6条经线隔离条 (利用3个贯穿两极的完整圆环交叉实现)
+                for (let i = 0; i < 3; i++) {
+                    const meridian = new THREE.Mesh(new THREE.TorusGeometry(neonRadius, tubeRadius, 16, 128), neonMat);
+                    // Three.js 默认 Torus 在 XY 平面，需先转到 YZ 平面 (Math.PI/2) 再按 60 度 (Math.PI/3) 均分
+                    meridian.rotation.y = Math.PI / 2 + i * (Math.PI / 3);
+                    this.scene.add(meridian);
+                }
 
                 this.buttons = [];
                 this.triangleVertices = [];
@@ -395,49 +494,61 @@
                 const geometry = new THREE.BufferGeometry();
                 const frameGeo = new THREE.BufferGeometry();
                 let verts = [], uvs = [], frameVerts = [];
-                let cSub_top = cSub.clone().addScaledVector(N, extrudeHeight);
                 let cSub_uv = new THREE.Vector2().addVectors(uvA, uvB).add(uvC).divideScalar(3);
-
                 const ringWidthRatio = 0.15;
+
+                // 核心算法升级：将所有平面坐标强制“充气”投影回真正的球面上，彻底消除穿模，化作完美的弧形曲面按钮！
+                const baseR = vA.length(); 
+                const topR = baseR + extrudeHeight;
+                const spherize = (pt, r) => pt.clone().normalize().multiplyScalar(r);
+
+                let cSub_sph = spherize(cSub, baseR);
+                let cSub_top_sph = spherize(cSub, topR);
 
                 for (let i = 0; i < loopPoints.length; i++) {
                     let p1 = loopPoints[i], p2 = loopPoints[(i + 1) % loopPoints.length];
                     let u1 = loopUvs[i], u2 = loopUvs[(i + 1) % loopUvs.length];
-                    let p1_top = p1.clone().addScaledVector(N, extrudeHeight);
-                    let p2_top = p2.clone().addScaledVector(N, extrudeHeight);
 
-                    let p1_in = p1_top.clone().lerp(cSub_top, ringWidthRatio);
-                    let p2_in = p2_top.clone().lerp(cSub_top, ringWidthRatio);
+                    // 底面弧形贴合坐标
+                    let p1_sph = spherize(p1, baseR);
+                    let p2_sph = spherize(p2, baseR);
+
+                    // 顶面弧形外圈坐标
+                    let p1_top_sph = spherize(p1, topR);
+                    let p2_top_sph = spherize(p2, topR);
+
+                    // 顶面弧形内圈（花瓣核心区域）
+                    let p1_in = p1_top_sph.clone().lerp(cSub_top_sph, ringWidthRatio);
+                    let p2_in = p2_top_sph.clone().lerp(cSub_top_sph, ringWidthRatio);
+                    let p1_in_sph = spherize(p1_in, topR);
+                    let p2_in_sph = spherize(p2_in, topR);
+
                     let u1_in = u1.clone().lerp(cSub_uv, ringWidthRatio);
                     let u2_in = u2.clone().lerp(cSub_uv, ringWidthRatio);
 
-                    verts.push(cSub_top.x, cSub_top.y, cSub_top.z, p1_in.x, p1_in.y, p1_in.z, p2_in.x, p2_in.y, p2_in.z);
+                    // 构造花瓣按键实体面 (绝对平滑曲面)
+                    verts.push(cSub_top_sph.x, cSub_top_sph.y, cSub_top_sph.z, p1_in_sph.x, p1_in_sph.y, p1_in_sph.z, p2_in_sph.x, p2_in_sph.y, p2_in_sph.z);
                     uvs.push(cSub_uv.x, cSub_uv.y, u1_in.x, u1_in.y, u2_in.x, u2_in.y);
-                    verts.push(cSub.x, cSub.y, cSub.z, p2.x, p2.y, p2.z, p1.x, p1.y, p1.z);
+                    verts.push(cSub_sph.x, cSub_sph.y, cSub_sph.z, p2_sph.x, p2_sph.y, p2_sph.z, p1_sph.x, p1_sph.y, p1_sph.z);
                     uvs.push(cSub_uv.x, cSub_uv.y, u2.x, u2.y, u1.x, u1.y);
 
-                    let p1_top_out = p1_top.clone().addScaledVector(N, 0.002);
-                    let p2_top_out = p2_top.clone().addScaledVector(N, 0.002);
-                    let p1_in_out = p1_in.clone().addScaledVector(N, 0.002);
-                    let p2_in_out = p2_in.clone().addScaledVector(N, 0.002);
+                    // 构造金属边框 (绝对平滑曲面)
+                    let outR = topR + 0.002;
+                    let p1_top_out = spherize(p1_top_sph, outR);
+                    let p2_top_out = spherize(p2_top_sph, outR);
+                    let p1_in_out = spherize(p1_in_sph, outR);
+                    let p2_in_out = spherize(p2_in_sph, outR);
 
                     frameVerts.push(p1_top_out.x, p1_top_out.y, p1_top_out.z, p2_top_out.x, p2_top_out.y, p2_top_out.z, p2_in_out.x, p2_in_out.y, p2_in_out.z);
                     frameVerts.push(p1_top_out.x, p1_top_out.y, p1_top_out.z, p2_in_out.x, p2_in_out.y, p2_in_out.z, p1_in_out.x, p1_in_out.y, p1_in_out.z);
-                    frameVerts.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p2_top.x, p2_top.y, p2_top.z);
-                    frameVerts.push(p1.x, p1.y, p1.z, p2_top.x, p2_top.y, p2_top.z, p1_top.x, p1_top.y, p1_top.z);
+                    frameVerts.push(p1_sph.x, p1_sph.y, p1_sph.z, p2_sph.x, p2_sph.y, p2_sph.z, p2_top_sph.x, p2_top_sph.y, p2_top_sph.z);
+                    frameVerts.push(p1_sph.x, p1_sph.y, p1_sph.z, p2_top_sph.x, p2_top_sph.y, p2_top_sph.z, p1_top_sph.x, p1_top_sph.y, p1_top_sph.z);
                 }
 
                 geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
                 geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-                // 强制使每个顶点的法线等于其空间坐标归一化方向，实现完美的球面平滑光照，彻底消除黑斑
-                const posAttr = geometry.attributes.position;
-                const normArr = [];
-                for (let i = 0; i < posAttr.count; i++) {
-                    const vx = posAttr.getX(i), vy = posAttr.getY(i), vz = posAttr.getZ(i);
-                    const len = Math.hypot(vx, vy, vz);
-                    normArr.push(vx / len, vy / len, vz / len);
-                }
-                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normArr, 3));
+                // 使用标准几何法线计算，避免强制径向法线导致按钮侧壁和底面阴影死锁全黑
+                geometry.computeVertexNormals();
 
                 frameGeo.setAttribute('position', new THREE.Float32BufferAttribute(frameVerts, 3));
                 frameGeo.computeVertexNormals();
