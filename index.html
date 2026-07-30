@@ -299,7 +299,7 @@
                     0x9D8CFF  // 11. 亮紫罗兰 (极度冷色调，与明黄彻底解耦)
                 ];
 
-                // 批量生成 12 种材质 (既然排除了材质Bug，恢复环境反光让质感更好，同时保持双面渲染)
+                // 批量生成 12 种材质
                 this.regionMaterials = palette12.map(hex => {
                     return new THREE.MeshStandardMaterial({ 
                         map: TextureFactory.createTexture(hex), 
@@ -308,6 +308,18 @@
                         envMap: envTexture,
                         envMapIntensity: 0.6,
                         side: THREE.DoubleSide
+                    });
+                });
+
+                // 核心修改：生成 12 种镶边材质，深色配浅色边，浅色配深色边
+                this.frameMaterials = palette12.map((hex, idx) => {
+                    const partnerIdx = idx < 6 ? idx + 6 : idx - 6;
+                    return new THREE.MeshStandardMaterial({ 
+                        color: palette12[partnerIdx], 
+                        roughness: 0.1, 
+                        metalness: 0.8,
+                        envMap: envTexture,
+                        envMapIntensity: 1.5
                     });
                 });
 
@@ -627,9 +639,17 @@
             updateVisuals() {
                 for (let i = 0; i < 108; i++) {
                     let colorId = this.state[i];
-                    // 动态从 12 色预设材质或空位材质中读取
-                    let mat = (colorId === 12) ? this.emptyMaterial : this.regionMaterials[colorId];
-                    this.buttons[i].material = mat;
+                    const frame = this.buttons[i].children[0];
+                    if (colorId === 12) {
+                        this.buttons[i].material = this.emptyMaterial;
+                        if (frame) frame.visible = false; // 空位不显示镶边
+                    } else {
+                        this.buttons[i].material = this.regionMaterials[colorId];
+                        if (frame) {
+                            frame.visible = true;
+                            frame.material = this.frameMaterials[colorId];
+                        }
+                    }
                 }
             }
 
