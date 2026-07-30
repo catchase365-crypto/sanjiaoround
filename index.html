@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>108键球体花容锁·十二色幻阵</title>
+    <style>
+        :root {
+            --accent: #e0d0a0;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0c1013;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            user-select: none;
+        }
+
+        /* 液态毛玻璃背景系统 */
+        .liquid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            overflow: hidden;
+            background-color: #050709;
+        }
+        .liquid-circle {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(8vh);
+            opacity: 0.5;
+            animation: float 12s infinite alternate ease-in-out;
+        }
+        .circle-emerald { background: #50C878; width: max(35vw, 35vh); height: max(35vw, 35vh); top: -10%; left: -10%; }
+        .circle-violet { background: #8A2BE2; width: max(40vw, 40vh); height: max(40vw, 40vh); bottom: -10%; right: -10%; animation-delay: -2s; }
+        .circle-seablue { background: #006994; width: max(35vw, 35vh); height: max(35vw, 35vh); top: -10%; right: -10%; animation-delay: -4s; }
+        .circle-magenta { background: #FF00FF; width: max(35vw, 35vh); height: max(35vw, 35vh); bottom: -10%; left: -10%; animation-delay: -6s; }
+        .circle-orange { background: #FFAC1C; width: max(45vw, 45vh); height: max(45vw, 45vh); top: 50%; left: 50%; transform: translate(-50%, -50%); animation: float-center 15s infinite alternate ease-in-out; opacity: 0.35; }
+
+        @keyframes float { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(8%, 8%) scale(1.15); } }
+        @keyframes float-center { 0% { transform: translate(-50%, -50%) scale(1); } 100% { transform: translate(-45%, -45%) scale(1.2); } }
+
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* 毛玻璃 UI 面板 */
+        #ui-panel, .controls, #victory-overlay .win-box {
+            background: rgba(20, 25, 30, 0.3);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); border-radius: 16px;
+        }
+        
+        #ui-panel { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; text-align: center; color: #ffffff; pointer-events: none; z-index: 10; padding: 15px 20px; }
+        h1 { margin: 0 0 8px 0; font-size: 24px; letter-spacing: 2px; color: #e0d0a0; text-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        p { margin: 0; font-size: 13px; color: #b0c0d0; line-height: 1.5; }
+        
+        .controls { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: auto; z-index: 20; padding: 15px 30px; }
+        .btn-group { display: flex; gap: 20px; }
+        button { background: rgba(28, 37, 44, 0.7); color: #e0d0a0; border: 1px solid #e0d0a0; padding: 12px 24px; font-size: 14px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-weight: bold; letter-spacing: 1px; }
+        button:hover { background: #e0d0a0; color: #1c252c; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(224, 208, 160, 0.4); }
+        button:active { transform: scale(0.95); }
+        
+        #victory-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0; transition: opacity 0.5s ease; z-index: 50; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
+        #victory-overlay.show { opacity: 1; pointer-events: auto; }
+        .win-box { padding: 40px 60px; display: flex; flex-direction: column; align-items: center; }
+        .win-text { font-size: 42px; font-weight: bold; color: #ffd700; text-shadow: 0 0 20px rgba(255, 215, 0, 0.6); margin-bottom: 25px; letter-spacing: 4px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
+</head>
+<body>
+
+    <div class="liquid-bg">
+        <div class="liquid-circle circle-emerald"></div>
+        <div class="liquid-circle circle-violet"></div>
+        <div class="liquid-circle circle-seablue"></div>
+        <div class="liquid-circle circle-magenta"></div>
+        <div class="liquid-circle circle-orange"></div>
+    </div>
+
+    <div id="ui-panel">
+        <h1>Catchase · 花蓉锁 (108键)</h1>
+        <p>12 大区 × 12 独立色彩极难挑战</p>
+    </div>
+    
+    <div id="canvas-container"></div>
+
+    <div id="victory-overlay">
+        <div class="win-box">
+            <div class="win-text">阵法已破 浑然天成</div>
+            <button onclick="game.shuffle()">再破一陈</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="btn-group">
+            <button onclick="game.shuffle()" title="瞬间打乱" style="font-size: 20px;">🌀</button>
+            <button onclick="game.reset()" title="复位" style="font-size: 20px;">🔄</button>
+        </div>
+    </div>
+
+    <script>
+        // 彻底清除了噪点生成，保留花朵纹理，保证材质的纯净和抗锯齿
+        const TextureFactory = {
+            cache: {},
+            createTexture(colorHex) {
+                if(this.cache[colorHex]) return this.cache[colorHex];
+                
+                const size = 512; 
+                const canvas = document.createElement('canvas'); 
+                canvas.width = size; canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                const col = new THREE.Color(colorHex);
+                
+                // 纯净底色 (RGB 强制取整，兼容安卓 Canvas2D)
+                ctx.fillStyle = `rgb(${Math.round(col.r*210)}, ${Math.round(col.g*210)}, ${Math.round(col.b*210)})`;
+                ctx.fillRect(0,0,size,size);
+                
+                // 柔和径向渐变（代替原来的噪点）
+                const grad = ctx.createRadialGradient(size/2,size/2,size*0.2,size/2,size/2,size*0.9);
+                grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.3)');
+                ctx.fillStyle = grad; ctx.fillRect(0,0,size,size);
+                
+                // 绘制花瓣阵列
+                const m = size / 2; const rootY = m; 
+                ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(255, 255, 255, 0.6)'; 
+                ctx.lineWidth = 1; ctx.lineCap = 'round';
+
+                const totalPetals = 8;
+                for (let i = 0; i < totalPetals; i++) {
+                    const angle = (i * 2 * Math.PI) / totalPetals + (i * 0.05);
+                    const maxReach = 82 + (i % 3) * 11; 
+                    const controlOffset = 52; 
+                    
+                    const tipX = m + maxReach * Math.cos(angle);
+                    const tipY = rootY - maxReach * Math.sin(angle); 
+
+                    const petalGradient = ctx.createLinearGradient(m, rootY, tipX, tipY);
+                    const baseRgb = `rgb(${Math.round(col.r * 255)}, ${Math.round(col.g * 255)}, ${Math.round(col.b * 255)})`;
+                    const darkRgb = `rgb(${Math.round(col.r * 255 * 0.6)}, ${Math.round(col.g * 255 * 0.6)}, ${Math.round(col.b * 255 * 0.6)})`;
+
+                    petalGradient.addColorStop(0, darkRgb); 
+                    petalGradient.addColorStop(0.6, baseRgb); 
+                    petalGradient.addColorStop(1, '#FFFFFF'); 
+
+                    ctx.beginPath();
+                    ctx.moveTo(m, rootY); 
+                    ctx.quadraticCurveTo(m + controlOffset * Math.cos(angle - 0.6), rootY + controlOffset * Math.sin(angle - 0.6), tipX, tipY);
+                    ctx.quadraticCurveTo(m + controlOffset * Math.cos(angle + 0.6), rootY + controlOffset * Math.sin(angle + 0.6), m, rootY);
+                    ctx.fillStyle = petalGradient; ctx.fill();
+                    
+                    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.stroke();
+                }
+
+                // 中心发光纯净点（代替原来的褐色点）
+                ctx.shadowBlur = 0; ctx.beginPath();
+                ctx.arc(m, rootY, 12, 0, Math.PI * 2); 
+                ctx.fillStyle = '#FFFFFF'; ctx.fill();
+
+                const tex = new THREE.CanvasTexture(canvas); tex.anisotropy=8;
+                this.cache[colorHex] = tex; return tex;
+            }
+        };
+
+        class SphereTetrahedronPuzzle {
+            constructor() {
+                this.initScene();
+                this.initPuzzleData();
+                this.buildGeometry();
+                this.setupInteractions();
+                this.animate();
+                this.isShuffling = false;
+            }
+
+            initScene() {
+                const container = document.getElementById('canvas-container');
+                this.scene = new THREE.Scene();
+
+                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+                this.camera.position.set(0, 2, 7.5);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setClearColor(0x000000, 0);
+                this.renderer.outputEncoding = THREE.sRGBEncoding;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                container.appendChild(this.renderer.domElement);
+
+                this.controls = new THREE.TrackballControls(this.camera, this.renderer.domElement);
+                this.controls.rotateSpeed = 3.0;
+                this.controls.zoomSpeed = 1.2;
+                this.controls.noPan = true;
+                this.controls.dynamicDampingFactor = 0.1;
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+                this.scene.add(ambientLight);
+
+                // 增加半球光，提供无死角漫反射环境，消除光照盲区
+                const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+                this.scene.add(hemiLight);
+
+                const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+                dirLight1.position.set(5, 10, 7);
+                this.scene.add(dirLight1);
+
+                const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+                dirLight2.position.set(-5, -5, -5);
+                this.scene.add(dirLight2);
+
+                const envCanvas = document.createElement('canvas');
+                envCanvas.width = 256; envCanvas.height = 256;
+                const envCtx = envCanvas.getContext('2d');
+                const envGrad = envCtx.createLinearGradient(0, 0, 256, 256);
+                envGrad.addColorStop(0, '#0d1b2a'); envGrad.addColorStop(0.5, '#415a77'); envGrad.addColorStop(1, '#e0e1dd');
+                envCtx.fillStyle = envGrad; envCtx.fillRect(0, 0, 256, 256);
+                const envTexture = new THREE.CanvasTexture(envCanvas);
+                envTexture.mapping = THREE.EquirectangularReflectionMapping;
+
+                // 12 个绝对独立的硬核辨识色彩 (十六进制)
+                const palette12 = [
+                    0xE6194B, // 0. 红
+                    0x3CB44B, // 1. 绿
+                    0xFFE119, // 2. 黄
+                    0x4363D8, // 3. 蓝
+                    0xF58231, // 4. 橙
+                    0x911EB4, // 5. 紫
+                    0x42D4F4, // 6. 青
+                    0xF032E6, // 7. 品红
+                    0xBFEF45, // 8. 青柠
+                    0xFABED4, // 9. 粉
+                    0x469990, // 10. 青翠
+                    0x9A6324  // 11. 褐
+                ];
+
+                // 批量生成 12 种材质（提高粗糙度、降低金属度并调亮环境强度以彻底消除黑斑）
+                this.regionMaterials = palette12.map(hex => {
+                    return new THREE.MeshStandardMaterial({ 
+                        map: TextureFactory.createTexture(hex), 
+                        roughness: 0.45, 
+                        metalness: 0.05, 
+                        envMap: envTexture, 
+                        envMapIntensity: 1.0 
+                    });
+                });
+
+                // 空白块材质 (白色)
+                this.emptyMaterial = new THREE.MeshStandardMaterial({ 
+                    map: TextureFactory.createTexture(0xe6e6e6), 
+                    roughness: 0.4, 
+                    metalness: 0.05, 
+                        envMap: envTexture, 
+                        envMapIntensity: 1.0 
+                });
+
+                // 球体底座、边框金属材质
+                this.materials = {
+                    base: new THREE.MeshStandardMaterial({ color: 0x060b14, roughness: 0.2, metalness: 0.6 }),
+                    aluminum: new THREE.MeshStandardMaterial({ color: 0x0c0f12, roughness: 0.2, metalness: 0.95, envMap: envTexture, envMapIntensity: 3.0 })
+                };
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.controls.handleResize();
+                });
+            }
+
+            initPuzzleData() {
+                // 108个格位数据: 12个区域 × 每区域9块
+                this.initialState = new Array(108);
+                for (let i = 0; i < 108; i++) {
+                    this.initialState[i] = Math.floor(i / 9); // 0 到 11 对应 12 种颜色 ID
+                }
+                // 设置区域0的正中央倒三角形为空位 (ID = 12)。 9贴片布局中，索引4对应中间排倒置的那个
+                this.initialState[4] = 12; 
+                
+                this.state = [...this.initialState];
+                this.adj = [];
+            }
+
+            sphereCoord(lat, lon, radius) {
+                return new THREE.Vector3(
+                    radius * Math.cos(lat) * Math.sin(lon),
+                    radius * Math.sin(lat),
+                    radius * Math.cos(lat) * Math.cos(lon)
+                );
+            }
+
+            buildGeometry() {
+                const R = 2.4; 
+                const shrinkFactor = 0.92;
+                const extrudeHeight = 0.06;
+
+                const baseSphere = new THREE.Mesh(new THREE.SphereGeometry(R - 0.02, 64, 64), this.materials.base);
+                this.scene.add(baseSphere);
+
+                this.buttons = [];
+                this.triangleVertices = [];
+
+                let localIdx = 0;
+
+                // 划分 12 个球面大三角区域（北半球6个，南半球6个）
+                for (let zone = 0; zone < 12; zone++) {
+                    const isNorth = zone < 6;
+                    const segIndex = zone % 6;
+
+                    // 经度划分
+                    const lonMin = segIndex * (Math.PI / 3);
+                    const lonMax = (segIndex + 1) * (Math.PI / 3);
+                    const lonMid = (lonMin + lonMax) / 2;
+
+                    let topPt, botLeftPt, botRightPt;
+                    if (isNorth) {
+                        topPt = this.sphereCoord(Math.PI / 2, lonMid, R); 
+                        botLeftPt = this.sphereCoord(0, lonMin, R);       
+                        botRightPt = this.sphereCoord(0, lonMax, R);      
+                    } else {
+                        topPt = this.sphereCoord(-Math.PI / 2, lonMid, R); 
+                        botLeftPt = this.sphereCoord(0, lonMax, R);        
+                        botRightPt = this.sphereCoord(0, lonMin, R);
+                    }
+
+                    const getP = (r, c) => {
+                        let wA = 3 - r;
+                        let wB = r - c;
+                        let wC = c;
+                        return new THREE.Vector3(
+                            wA*topPt.x + wB*botLeftPt.x + wC*botRightPt.x,
+                            wA*topPt.y + wB*botLeftPt.y + wC*botRightPt.y,
+                            wA*topPt.z + wB*botLeftPt.z + wC*botRightPt.z
+                        ).normalize().multiplyScalar(R);
+                    };
+
+                    let zoneLocalIdx = 0;
+                    for (let r = 0; r <= 2; r++) {
+                        for (let c = 0; c <= r; c++) {
+                            const uvU_A = new THREE.Vector2(0.5, 1.0); const uvU_B = new THREE.Vector2(0.067, 0.25); const uvU_C = new THREE.Vector2(0.933, 0.25);
+                            const uvI_A = new THREE.Vector2(0.067, 0.75); const uvI_B = new THREE.Vector2(0.5, 0.0); const uvI_C = new THREE.Vector2(0.933, 0.75);
+
+                            let p1 = getP(r, c); let p2 = getP(r + 1, c); let p3 = getP(r + 1, c + 1);
+                            let N1 = new THREE.Vector3().addVectors(p1, p2).add(p3).normalize();
+                            this.createButton(p1, p2, p3, uvU_A, uvU_B, uvU_C, N1, zone, zoneLocalIdx++, shrinkFactor, extrudeHeight, localIdx++);
+
+                            if (c < r) {
+                                let p4 = getP(r, c); let p5 = getP(r + 1, c + 1); let p6 = getP(r, c + 1);
+                                let N2 = new THREE.Vector3().addVectors(p4, p5).add(p6).normalize();
+                                this.createButton(p4, p5, p6, uvI_A, uvI_B, uvI_C, N2, zone, zoneLocalIdx++, shrinkFactor, extrudeHeight, localIdx++);
+                            }
+                        }
+                    }
+                }
+
+                this.generateAdjacencyGraph();
+                this.updateVisuals();
+            }
+
+            createButton(vA, vB, vC, uvA, uvB, uvC, N, zone, zoneLocalIdx, shrinkFactor, extrudeHeight, globalIdx) {
+                let cross = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(vB, vA), new THREE.Vector3().subVectors(vC, vA));
+                if (cross.dot(N) < 0) {
+                    let temp = vB; vB = vC; vC = temp;
+                    let tempUv = uvB; uvB = uvC; uvC = tempUv; 
+                }
+
+                this.triangleVertices.push([vA, vB, vC]); 
+
+                let cSub = new THREE.Vector3().addVectors(vA, vB).add(vC).divideScalar(3);
+                let v1 = new THREE.Vector3().subVectors(vA, cSub).multiplyScalar(shrinkFactor).add(cSub);
+                let v2 = new THREE.Vector3().subVectors(vB, cSub).multiplyScalar(shrinkFactor).add(cSub);
+                let v3 = new THREE.Vector3().subVectors(vC, cSub).multiplyScalar(shrinkFactor).add(cSub);
+
+                let f = 0.22;
+                let corners = [v1, v2, v3]; let uvsCorners = [uvA, uvB, uvC];
+                let loopPoints = []; let loopUvs = [];
+
+                for (let i = 0; i < 3; i++) {
+                    let curr = corners[i], prev = corners[(i + 2) % 3], next = corners[(i + 1) % 3];
+                    let cuv = uvsCorners[i], puv = uvsCorners[(i + 2) % 3], nuv = uvsCorners[(i + 1) % 3];
+                    let pA = curr.clone().lerp(prev, f), uvA_pt = cuv.clone().lerp(puv, f);
+                    let pB = curr.clone().lerp(next, f), uvB_pt = cuv.clone().lerp(nuv, f);
+                    for (let j = 0; j <= 4; j++) {
+                        let t = j / 4;
+                        let p = new THREE.Vector3().addScaledVector(pA, (1 - t) * (1 - t)).addScaledVector(curr, 2 * (1 - t) * t).addScaledVector(pB, t * t);
+                        let uv = new THREE.Vector2().addScaledVector(uvA_pt, (1 - t) * (1 - t)).addScaledVector(cuv, 2 * (1 - t) * t).addScaledVector(uvB_pt, t * t);
+                        loopPoints.push(p); loopUvs.push(uv);
+                    } 
+                }
+
+                const geometry = new THREE.BufferGeometry();
+                const frameGeo = new THREE.BufferGeometry();
+                let verts = [], uvs = [], frameVerts = [];
+                let cSub_top = cSub.clone().addScaledVector(N, extrudeHeight);
+                let cSub_uv = new THREE.Vector2().addVectors(uvA, uvB).add(uvC).divideScalar(3);
+
+                const ringWidthRatio = 0.15;
+
+                for (let i = 0; i < loopPoints.length; i++) {
+                    let p1 = loopPoints[i], p2 = loopPoints[(i + 1) % loopPoints.length];
+                    let u1 = loopUvs[i], u2 = loopUvs[(i + 1) % loopUvs.length];
+                    let p1_top = p1.clone().addScaledVector(N, extrudeHeight);
+                    let p2_top = p2.clone().addScaledVector(N, extrudeHeight);
+
+                    let p1_in = p1_top.clone().lerp(cSub_top, ringWidthRatio);
+                    let p2_in = p2_top.clone().lerp(cSub_top, ringWidthRatio);
+                    let u1_in = u1.clone().lerp(cSub_uv, ringWidthRatio);
+                    let u2_in = u2.clone().lerp(cSub_uv, ringWidthRatio);
+
+                    verts.push(cSub_top.x, cSub_top.y, cSub_top.z, p1_in.x, p1_in.y, p1_in.z, p2_in.x, p2_in.y, p2_in.z);
+                    uvs.push(cSub_uv.x, cSub_uv.y, u1_in.x, u1_in.y, u2_in.x, u2_in.y);
+                    verts.push(cSub.x, cSub.y, cSub.z, p2.x, p2.y, p2.z, p1.x, p1.y, p1.z);
+                    uvs.push(cSub_uv.x, cSub_uv.y, u2.x, u2.y, u1.x, u1.y);
+
+                    let p1_top_out = p1_top.clone().addScaledVector(N, 0.002);
+                    let p2_top_out = p2_top.clone().addScaledVector(N, 0.002);
+                    let p1_in_out = p1_in.clone().addScaledVector(N, 0.002);
+                    let p2_in_out = p2_in.clone().addScaledVector(N, 0.002);
+
+                    frameVerts.push(p1_top_out.x, p1_top_out.y, p1_top_out.z, p2_top_out.x, p2_top_out.y, p2_top_out.z, p2_in_out.x, p2_in_out.y, p2_in_out.z);
+                    frameVerts.push(p1_top_out.x, p1_top_out.y, p1_top_out.z, p2_in_out.x, p2_in_out.y, p2_in_out.z, p1_in_out.x, p1_in_out.y, p1_in_out.z);
+                    frameVerts.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p2_top.x, p2_top.y, p2_top.z);
+                    frameVerts.push(p1.x, p1.y, p1.z, p2_top.x, p2_top.y, p2_top.z, p1_top.x, p1_top.y, p1_top.z);
+                }
+
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+                geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+                // 强制使每个顶点的法线等于其空间坐标归一化方向，实现完美的球面平滑光照，彻底消除黑斑
+                const posAttr = geometry.attributes.position;
+                const normArr = [];
+                for (let i = 0; i < posAttr.count; i++) {
+                    const vx = posAttr.getX(i), vy = posAttr.getY(i), vz = posAttr.getZ(i);
+                    const len = Math.hypot(vx, vy, vz);
+                    normArr.push(vx / len, vy / len, vz / len);
+                }
+                geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normArr, 3));
+
+                frameGeo.setAttribute('position', new THREE.Float32BufferAttribute(frameVerts, 3));
+                frameGeo.computeVertexNormals();
+
+                // 初始化时暂时用 default 材质，在 updateVisuals 时精准刷新颜色
+                const buttonMesh = new THREE.Mesh(geometry, this.emptyMaterial);
+                const frameMesh = new THREE.Mesh(frameGeo, this.materials.aluminum);
+                buttonMesh.add(frameMesh);
+                
+                buttonMesh.userData = {
+                    index: globalIdx,
+                    normal: N.clone(),
+                    isPressed: false,
+                    animProgress: 0,
+                    onPressPeak: null
+                };
+
+                this.scene.add(buttonMesh);
+                this.buttons.push(buttonMesh);
+            }
+
+            generateAdjacencyGraph() {
+                for (let i = 0; i < 108; i++) this.adj[i] = [];
+                const isSame = (p1, p2) => p1.distanceTo(p2) < 0.005; 
+
+                for (let i = 0; i < 108; i++) {
+                    for (let j = i + 1; j < 108; j++) {
+                        let shared = 0;
+                        let triA = this.triangleVertices[i];
+                        let triB = this.triangleVertices[j];
+                        for(let a = 0; a < 3; a++) {
+                            for(let b = 0; b < 3; b++) {
+                                if (isSame(triA[a], triB[b])) { shared++; break; }
+                            }
+                        }
+                        if (shared === 2) {
+                            this.adj[i].push(j);
+                            this.adj[j].push(i);
+                        }
+                    }
+                }
+            }
+
+            setupInteractions() {
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                let isDragging = false, startPos = { x: 0, y: 0 };
+
+                window.addEventListener('pointerdown', e => {
+                    isDragging = false; startPos = { x: e.clientX, y: e.clientY };
+                });
+                window.addEventListener('pointermove', e => {
+                    if (Math.hypot(e.clientX - startPos.x, e.clientY - startPos.y) > 6) isDragging = true;
+                });
+                window.addEventListener('pointerup', e => {
+                    if (isDragging || this.isShuffling || e.target.closest('button')) return;
+                    this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    const intersects = this.raycaster.intersectObjects(this.buttons);
+                    if (intersects.length > 0) this.trySwap(intersects[0].object);
+                });
+            }
+
+            trySwap(hitButton) {
+                if (hitButton.userData.animProgress === 0 && !hitButton.userData.isPressed) {
+                    const clickedIndex = hitButton.userData.index;
+                    const emptyIndex = this.state.indexOf(12); // 空位ID是12
+
+                    if (this.adj[emptyIndex].includes(clickedIndex)) {
+                        hitButton.userData.isPressed = true;
+                        hitButton.userData.onPressPeak = () => {
+                            this.state[emptyIndex] = this.state[clickedIndex];
+                            this.state[clickedIndex] = 12;
+                            this.updateVisuals();
+                            this.checkWin();
+                        };
+                    } else {
+                        hitButton.userData.isPressed = true;
+                        hitButton.userData.onPressPeak = null;
+                    }
+                }
+            }
+
+            updateVisuals() {
+                for (let i = 0; i < 108; i++) {
+                    let colorId = this.state[i];
+                    // 动态从 12 色预设材质或空位材质中读取
+                    let mat = (colorId === 12) ? this.emptyMaterial : this.regionMaterials[colorId];
+                    this.buttons[i].material = mat;
+                }
+            }
+
+            shuffle() {
+                if (this.isShuffling) return;
+                document.getElementById('victory-overlay').classList.remove('show');
+
+                const totalSteps = 2000;
+                let lastEmpty = -1;
+
+                for (let i = 0; i < totalSteps; i++) {
+                    let emptyIdx = this.state.indexOf(12);
+                    let neighbors = this.adj[emptyIdx].filter(n => n !== lastEmpty);
+                    if (neighbors.length === 0) neighbors = this.adj[emptyIdx];
+                    let randomNext = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    
+                    this.state[emptyIdx] = this.state[randomNext];
+                    this.state[randomNext] = 12;
+                    lastEmpty = emptyIdx;
+                }
+
+                this.updateVisuals();
+                this.buttons.forEach(btn => btn.userData.animProgress = 0.5);
+            }
+
+            reset() {
+                if (this.isShuffling) return;
+                this.state = [...this.initialState];
+                this.updateVisuals();
+                document.getElementById('victory-overlay').classList.remove('show');
+                this.camera.position.set(0, 2, 7.5);
+                this.controls.reset();
+            }
+
+            checkWin() {
+                let isWin = true;
+                for (let i = 0; i < 108; i++) {
+                    if (this.state[i] !== this.initialState[i]) { isWin = false; break; }
+                }
+                if (isWin) document.getElementById('victory-overlay').classList.add('show');
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.controls.update();
+
+                const maxPressDepth = 0.08;
+                this.buttons.forEach(btn => {
+                    if (btn.userData.isPressed) {
+                        btn.userData.animProgress += 0.28;
+                        if (btn.userData.animProgress >= 1) {
+                            btn.userData.animProgress = 1;
+                            btn.userData.isPressed = false;
+                            if (typeof btn.userData.onPressPeak === 'function') {
+                                btn.userData.onPressPeak();
+                                btn.userData.onPressPeak = null;
+                            }
+                        }
+                    } else if (btn.userData.animProgress > 0) {
+                        btn.userData.animProgress -= 0.1;
+                        if (btn.userData.animProgress < 0) btn.userData.animProgress = 0;
+                    }
+                    const offset = -maxPressDepth * btn.userData.animProgress;
+                    btn.position.set(0, 0, 0).addScaledVector(btn.userData.normal, offset);
+                });
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        const game = new SphereTetrahedronPuzzle();
+    </script>
+</body>
+</html>
