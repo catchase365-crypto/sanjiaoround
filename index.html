@@ -696,7 +696,7 @@
                 requestAnimationFrame(() => this.animate());
                 this.controls.update();
 
-                const maxPressDepth = 0.08;
+                const maxPressDepth = 0.025;
                 this.buttons.forEach(btn => {
                     if (btn.userData.isPressed) {
                         btn.userData.animProgress += 0.28;
